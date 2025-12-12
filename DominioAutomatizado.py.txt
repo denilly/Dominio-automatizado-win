@@ -3,7 +3,7 @@ import os
 import sys
 
 def main():
-    script_name = "DominioAutomatizadoCOC.ps1"
+    script_name = "DominioAutomatizado.ps1"
 
     # Caminho correto mesmo após empacotar em EXE
     base_dir = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
@@ -16,3 +16,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
