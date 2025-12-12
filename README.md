@@ -15,7 +15,7 @@ Script para automatizar o ingresso de computadores no domínio Active Directory,
 > * Movimentação do objeto de computador para a OU definida.
 > * Adição ao grupo de segurança especificado.
 > * Interface gráfica interativa (GUI) para preenchimento de informações.
-> * Compatível com PowerShell 5.1 e 7+ (pode ser empacotado em .EXE via ferramentas como auto-py-to-exe).
+> * Compatível com PowerShell 5.1 e 7+ (pode ser empacotado em .EXE).
 > * Detecção automática de Domain Controllers (DCs) disponíveis via LDAPS.
 
 ---
@@ -87,6 +87,14 @@ Mantenha uma cópia de segurança deste script no seu diretório de backup. Para
 
 ---
 
+### 5. Geração de executável (.EXE)
+
+Para facilitar a distribuição e execução em máquinas de usuário, recomenda-se gerar um arquivo executável (.EXE).
+
+**Instruções detalhadas, incluindo o uso de auto-py-to-exe (interface gráfica para PyInstaller), estão disponíveis na [Wiki do repositório](https://github.com/denilly/Dominio-automatizado-win/wiki).**
+
+---
+
 ## Exemplos de uso
 
 ### Execução interativa (padrão):
@@ -96,6 +104,10 @@ C:\seu\caminho\para\o\script\DominioAutomatizado.ps1
 ```
 
 > Abre a GUI para preenchimento manual. Após o processo, o script oferece a opção de reinício automático (recomendado para aplicar as mudanças).
+
+### Execução do EXE gerado:
+
+Basta clicar duas vezes no arquivo `.exe` gerado (seguindo as instruções da Wiki). Ele solicitará privilégios de administrador automaticamente.
 
 ---
 
@@ -111,3 +123,7 @@ Sugestões, melhorias ou correções podem ser enviadas via **pull requests** ou
 Este projeto está licenciado sob a **GNU General Public License v3.0**.
 
 ---
+
+</ul>
+</body>
+</html>
