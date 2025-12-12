@@ -53,7 +53,7 @@ Este script é fornecido "**como está**" e pode ser utilizado e modificado por 
 notepad C:\caminho\para\os\seus\scripts\DominioAutomatizado.ps1
 ```
 
-Cole o código deste repositório no editor. Ajuste os parâmetros indicados com `<--` conforme a necessidade (ex.: mapeamento de OUs e grupos) e salve.
+Cole o código `.ps1` deste repositório no editor. Ajuste os parâmetros indicados com `<--` conforme a necessidade (ex.: mapeamento de OUs e grupos) e salve.
 
 > **💡 Importante:** Utilize codificação de caracteres UTF-8 com BOM para compatibilidade com PowerShell 5.1 e 7+ na criação do arquivo para a correta interpretação dos textos!
 
