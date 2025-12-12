@@ -89,7 +89,7 @@ Mantenha uma cópia de segurança deste script no seu diretório de backup. Para
 
 ### 5. Geração de executável (.EXE)
 
-Para facilitar a distribuição ao seu time de Suporte e assim executarem em máquinas de usuário, recomenda-se gerar um arquivo executável (.EXE).
+Para simplificar a distribuição ao time de Suporte e permitir a execução nas máquinas dos usuários, recomenda-se gerar um arquivo executável `.EXE`.
 
 **Instruções detalhadas, incluindo o uso de auto-py-to-exe (interface gráfica para PyInstaller), estão disponíveis na [Wiki do repositório](https://github.com/denilly/Dominio-automatizado-win/wiki).**
 
