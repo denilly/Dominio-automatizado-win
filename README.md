@@ -5,6 +5,10 @@
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
 
+<p align="center">
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/d19bf1b9-1125-4603-ba29-948254e1bbdf" />
+</p>
+
 ## Descrição
 
 Script para automatizar o ingresso de computadores no domínio Active Directory, com funcionalidades adicionais de movimentação para a Unidade Organizacional (OU) específica e adição ao grupo de segurança correspondente em ambiente Microsoft Windows.
