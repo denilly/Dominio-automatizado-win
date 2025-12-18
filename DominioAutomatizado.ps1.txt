@@ -25,16 +25,16 @@ IMPORTANTE: Execute este script diretamente e abrirá uma interface gráfica
 
 COMO USAR:
 1. Crie o arquivo do script com o seu editor preferido usando codificação de caracteres UTF-8
-#    com BOM para compatibilidade com Powershell 5.1 e 7+:
-#    > notepad C:\path\to\script\DominioAutomatizado.ps1
-# 2. Cole o código deste arquivo no editor, ajustes os parâmetros comentados com "<--" (quando  
-#    necessário) e salve o arquivo.
-# 3. Checar políticas de execução de scripts no PowerShell, e, se necessário, ajustar conforme 
-#    política interna:
-#    > Get-ExecutionPolicy -List
-#    > Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
-# 4. Execute o script:
-#    > .\DominioAutomatizado.ps1
+   com BOM para compatibilidade com Powershell 5.1 e 7+:
+   > notepad C:\path\to\script\DominioAutomatizado.ps1
+2. Cole o código deste arquivo no editor, ajustes os parâmetros comentados com "<--" (quando  
+   necessário) e salve o arquivo.
+3. Checar políticas de execução de scripts no PowerShell, e, se necessário, ajustar conforme 
+   política interna:
+   > Get-ExecutionPolicy -List
+   > Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
+4. Execute o script:
+   > .\DominioAutomatizado.ps1
 ---------------------------------------------------------------------------------
 #>
 #  1. ===================== CONFIGURAÇÕES GERAIS - AJUSTE CONFORME AMBIENTE =====================
@@ -575,4 +575,5 @@ $btn.Add_Click({
 })
 
 Log "Aplicativo iniciado - pronto para uso." "Lime"
+
 $form.ShowDialog()
