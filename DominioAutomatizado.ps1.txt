@@ -1,4 +1,4 @@
-﻿<#
+<#
 Este é um script PowerShell
 ---------------------------------------------------------------------------------
 Nome do arquivo de script: DominioAutomatizado.ps1
@@ -13,7 +13,7 @@ Data de Criação: 11/12/2025
 Projeto: https://github.com/denilly/Dominio-automatizado-win
 Copyright (c) 2025 Denilly Carvalho do Carmo. Todos os direitos reservados.
 Licença: GNU General Public License (GPL) versão 3
-Versão: 1.0
+Versão: 2.0
 
 NOTAS: Este script é fornecido "como está" e pode ser utilizado e modificado por 
 terceiros, desde que os créditos ao autor sejam mantidos. Para uso em projetos, 
@@ -21,7 +21,7 @@ por favor, faça referência a este script e ao autor.
 
 IMPORTANTE: Execute este script diretamente e abrirá uma interface gráfica
             com os campos necessários para preenchimento. Opcionalmente, este 
-            script poderá ser empacotado em .EXE (ex.: auto-py-to-exe).
+            script poderá ser empacotado em .EXE.
 
 COMO USAR:
 1. Crie o arquivo do script com o seu editor preferido usando codificação de caracteres UTF-8
@@ -38,8 +38,8 @@ COMO USAR:
 ---------------------------------------------------------------------------------
 #>
 #  1. ===================== CONFIGURAÇÕES GERAIS - AJUSTE CONFORME AMBIENTE =====================
-$ScriptVersion = '1.0'
-$ScriptRevision = '11/12/2025'
+$ScriptVersion = '2.0'
+$ScriptRevision = '01/2026'
 $LicencaGPL = 'GPL-3.0'
 
 # Títulos do Formulário
@@ -127,7 +127,7 @@ $servidorMap.Add("SRV-WIN-SERVICOS", @{
 Exemplo #>
 
 # ----------------------------------------------------------------------------------------------
-# Não altere a partir daqui!!!
+# NÃO ALTERE A PARTIR DAQUI!!!
 # ----------------------------------------------------------------------------------------------
 $OUMap.Add("Cliente", $clienteMap)
 $OUMap.Add("Servidor", $servidorMap)
@@ -139,6 +139,30 @@ $ErrorActionPreference = 'Stop'
 
 # Obtém o hostname atual
 $computerName = $env:COMPUTERNAME
+
+# Detectar se está no domínio
+$computerSystem = Get-CimInstance Win32_ComputerSystem
+$isDomainJoined = $computerSystem.PartOfDomain
+$currentDomain  = $computerSystem.Domain
+
+# Verifica se o script está sendo executado como Administrador
+$principal = New-Object Security.Principal.WindowsPrincipal(
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+)
+
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+
+    [System.Windows.Forms.MessageBox]::Show(
+        "Este aplicativo precisa ser executado como Administrador.`n`n" +
+        "Clique com o botão direito no arquivo e selecione:`n" +
+        "'Executar como administrador'.",
+        "Permissão insuficiente",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error
+    )
+
+    exit
+}
 
 # 2. ==================== EMBUTIR LOGO E ÍCONE (inclui a base64 da imagem e ícone) ====================
 
@@ -201,7 +225,108 @@ function Test-LdapsFast {
     } catch { return $false }
 }
 
-# 4. ==================== FORMULÁRIO ====================
+# Alternar entre os panels
+function Show-Step {
+    param(
+        [ValidateSet('Welcome','Hostname','Domain')]
+        [string]$Step
+    )
+
+    $panelWelcome.Visible    = $false
+    $panelHostname.Visible   = $false
+    $panelDomainJoin.Visible = $false
+
+    switch ($Step) {
+        'Welcome'  { $panelWelcome.Visible = $true }
+        'Hostname' { $panelHostname.Visible = $true }
+        'Domain'   { $panelDomainJoin.Visible = $true }
+    }
+}
+
+# Valida o hostname informado
+function Test-HostnameValid {
+    param (
+        [AllowEmptyString()]
+        [string]$Hostname
+    )
+
+    # Remove espaços acidentais
+    $Hostname = $Hostname.Trim()
+
+    # Não pode ser vazio
+    if ([string]::IsNullOrWhiteSpace($Hostname)) {
+        return "O hostname não pode estar vazio."
+    }
+
+    # Não pode conter ponto
+    if ($Hostname.Contains('.')) {
+        return "O hostname não pode conter pontos (.)."
+    }
+
+    # Apenas letras, números e hífen
+    if ($Hostname -notmatch '^[A-Za-z0-9-]+$') {
+        return "O hostname contém caracteres inválidos."
+    }
+
+    # Não pode começar ou terminar com hífen
+    if ($Hostname.StartsWith('-') -or $Hostname.EndsWith('-')) {
+        return "O hostname não pode começar ou terminar com hífen (-)."
+    }
+
+    # Não pode ser somente números
+    if ($Hostname -match '^\d+$') {
+        return "O hostname não pode conter apenas números."
+    }
+
+    # Limite NetBIOS (recomendado)
+    if ($Hostname.Length -gt 15) {
+        return "O hostname não pode ter mais de 15 caracteres."
+    }
+
+    return $null  # Válido
+}
+
+# Renomear nome da máquina
+function Rename-ComputerAndReboot {
+    param (
+        [Parameter(Mandatory)]
+        [string]$NewName,
+
+        [System.Management.Automation.PSCredential]
+        $DomainCredential = $null
+    )
+
+    $msg = "A máquina será reiniciada imediatamente e renomeada para:`n$NewName`n`n" +
+           "Após reiniciar, execute novamente o Domínio Automatizado."
+
+    $res = [System.Windows.Forms.MessageBox]::Show(
+        $msg,
+        "Confirmação",
+        [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+        [System.Windows.Forms.MessageBoxIcon]::Warning
+    )
+
+    if ($res -ne 'OK') { return }
+
+    try {
+        if ($DomainCredential) {
+            Rename-Computer -NewName $NewName -DomainCredential $DomainCredential -Force -Restart
+        }
+        else {
+            Rename-Computer -NewName $NewName -Force -Restart
+        }
+    }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Erro ao renomear o computador:`n`n$($_.Exception.Message)",
+            "Erro",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        )
+    }
+}
+
+# 4. ==================== FORMULÁRIO - GUI ====================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $TextForm
 $form.Size = [System.Drawing.Size]::new(520, 780)
@@ -210,6 +335,25 @@ $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
 $form.BackColor = [System.Drawing.Color]::FromArgb(245, 245, 245)  # Fundo cinza claro suave
 $form.Icon = Get-Icon $iconBase64
+
+# Painés do Wizard
+$panelWelcome    = New-Object System.Windows.Forms.Panel
+$panelHostname   = New-Object System.Windows.Forms.Panel
+$panelDomainJoin = New-Object System.Windows.Forms.Panel
+
+$panelWelcome.Dock    = 'None'
+$panelHostname.Dock   = 'None'
+$panelDomainJoin.Dock = 'None'
+
+foreach ($panel in @($panelWelcome, $panelHostname, $panelDomainJoin)) {
+    $panel.Location = [System.Drawing.Point]::new(0, 171)
+    $panel.Size     = [System.Drawing.Size]::new(520, 609)
+    $panel.Visible  = $false
+}
+
+$panelWelcome.Visible    = $false
+$panelHostname.Visible   = $false
+$panelDomainJoin.Visible = $false
 
 # Painel Cabeçalho
 $headerPanel = New-Object System.Windows.Forms.Panel
@@ -244,23 +388,178 @@ $divider.Location = [System.Drawing.Point]::new(30, 170)
 $divider.Size = [System.Drawing.Size]::new(460, 1)
 $form.Controls.Add($divider)
 
-# Painel Campos
-$fieldsPanel = New-Object System.Windows.Forms.Panel
-$fieldsPanel.Location = [System.Drawing.Point]::new(0, 180)
-$fieldsPanel.Size = [System.Drawing.Size]::new(520, 280)
-$fieldsPanel.BackColor = [System.Drawing.Color]::Transparent
-$form.Controls.Add($fieldsPanel)
+# ETAPA 1 - Boas-Vindas
+$lblWelcome = New-Object System.Windows.Forms.Label
+$lblWelcome.Text =
+"Bem-vindo ao Domínio Automatizado`n" +
+"Este assistente irá guiá-lo passo a passo.`n`n"
+$lblWelcome.AutoSize = $true
+$lblWelcome.Location = '30,100'
+$lblWelcome.Font = [System.Drawing.Font]::new("Segoe UI", 11)
 
-# 5. ==================== CAMPOS ====================
+$lblWelcomeInfo = New-Object System.Windows.Forms.Label
+$lblWelcomeInfo.Text =
+"Com ele você poderá:`n" +
+"• Alterar o nome do computador`n" +
+"• Ingressar ou reaplicar o computador no domínio`n" +
+"• Mover para a OU correta`n" +
+"• Associar automaticamente aos grupos adequados`n" +
+"• Definir a descrição do equipamento no Active Directory e localmente"
+$lblWelcomeInfo.AutoSize = $true
+$lblWelcomeInfo.Location = '30,160'
+$lblWelcomeInfo.Font = [System.Drawing.Font]::new("Segoe UI", 10)
+
+$btnWelcomeNext = New-Object System.Windows.Forms.Button
+$btnWelcomeNext.Text = 'AVANÇAR'
+$btnWelcomeNext.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215)
+$btnWelcomeNext.ForeColor = [System.Drawing.Color]::White
+$btnWelcomeNext.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$btnWelcomeNext.FlatStyle = "Flat"
+$btnWelcomeNext.FlatAppearance.BorderSize = 0
+$btnWelcomeNext.Anchor = 'Bottom,Right'
+$btnWelcomeNext.Location = [System.Drawing.Point]::new(340, 510)
+$btnWelcomeNext.Size = '140,40'
+$btnWelcomeNext.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
+$btnWelcomeNext.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
+$btnWelcomeNext.Add_Click({
+    Show-Step 'Hostname'
+})
+
+$panelWelcome.Controls.AddRange(@(
+    $lblWelcome,
+    $lblWelcomeInfo,
+    $btnWelcomeNext
+))
+
+# ETAPA 2 - Hostname
+$lblHost = New-Object System.Windows.Forms.Label
+$lblHost.Text = "Deseja alterar o nome do computador?"
+$lblHost.AutoSize = $true
+$lblHost.Location = '30,100'
+$lblHost.Font = [System.Drawing.Font]::new("Segoe UI", 11)
+
+$rbHostYes = New-Object System.Windows.Forms.RadioButton
+$rbHostYes.Text = 'Sim, alterar o nome do computador'
+$rbHostYes.Font = [System.Drawing.Font]::new("Segoe UI", 10)
+$rbHostYes.FlatStyle = "Flat"
+$rbHostYes.Location = '30,140'
+$rbHostYes.AutoSize = $true
+
+$rbHostNo = New-Object System.Windows.Forms.RadioButton
+$rbHostNo.Text = 'Não, manter o nome atual'
+$rbHostNo.Font = [System.Drawing.Font]::new("Segoe UI", 10)
+$rbHostNo.FlatStyle = "Flat"
+$rbHostNo.Location = '30,170'
+$rbHostNo.Checked = $true
+$rbHostNo.AutoSize = $true
+
+$txtHostname = New-Object System.Windows.Forms.TextBox
+$txtHostname.Location = '50,210'
+$txtHostname.Width = 200
+$txtHostname.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$txtHostname.BackColor = "White"
+$txtHostname.BorderStyle = "FixedSingle"
+$txtHostname.Enabled = $false
+$txtHostname.Text = $env:COMPUTERNAME
+
+$rbHostYes.Add_CheckedChanged({
+    $txtHostname.Enabled = $rbHostYes.Checked
+})
+
+$btnHostNext = New-Object System.Windows.Forms.Button
+$btnHostNext.Text = 'AVANÇAR'
+$btnHostNext.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215)
+$btnHostNext.ForeColor = [System.Drawing.Color]::White
+$btnHostNext.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$btnHostNext.FlatStyle = "Flat"
+$btnHostNext.FlatAppearance.BorderSize = 0
+$btnHostNext.Anchor = 'Bottom,Right'
+$btnHostNext.Location = [System.Drawing.Point]::new(340, 510)
+$btnHostNext.Size = '140,40'
+$btnHostNext.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
+$btnHostNext.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
+$btnHostNext.Add_Click({
+    if ($rbHostYes.Checked) {
+        $error = Test-HostnameValid -Hostname $txtHostname.Text
+        if ($error) {
+            [System.Windows.Forms.MessageBox]::Show(
+                $error,
+                "Hostname inválido",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            )
+            return
+        }
+        # Se já estiver no domínio, avisa e pede credencial
+        if ($isDomainJoined) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Este computador já está ingressado no domínio.`n`n" +
+                "Para alterar o hostname, será necessário informar credenciais de um usuário do domínio com permissão.",
+                "Permissão necessária",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
+            # Solicita credencial de domínio
+            $cred = Get-Credential -Message "Informe credencial de domínio com permissão para renomear o computador"
+            if (-not $cred) {
+                return
+            }
+            Rename-ComputerAndReboot -NewName $txtHostname.Text -DomainCredential $cred
+        }
+        else {
+            # Máquina fora do domínio
+            Rename-ComputerAndReboot -NewName $txtHostname.Text
+        }
+    }
+    else {
+        Show-Step 'Domain'
+    }
+})
+
+$btnHostBack = New-Object System.Windows.Forms.Button
+$btnHostBack.Text = 'VOLTAR'
+$btnHostBack.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215)
+$btnHostBack.ForeColor = [System.Drawing.Color]::White
+$btnHostBack.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$btnHostBack.FlatStyle = "Flat"
+$btnHostBack.FlatAppearance.BorderSize = 0
+$btnHostBack.Anchor = 'Bottom,Left'
+$btnHostBack.Location = [System.Drawing.Point]::new(30, 510)
+$btnHostBack.Size = '140,40'
+$btnHostBack.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
+$btnHostBack.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
+$btnHostBack.Add_Click({
+    Show-Step 'Welcome'
+})
+
+$panelHostname.Controls.AddRange(@(
+    $lblHost,
+    $rbHostYes,
+    $rbHostNo,
+    $txtHostname,
+    $btnHostNext,
+    $btnHostBack
+))
+
+# ETAPA 3 - Campos do DomainJoin
+# Painel Campos do Domain Join
+$fieldsPanel = New-Object System.Windows.Forms.Panel
+$fieldsPanel.Location = [System.Drawing.Point]::new(0, 10)
+$fieldsPanel.Size = [System.Drawing.Size]::new(520, 280)
+$fieldsPanel.Anchor = 'Top,Left,Right'
+$fieldsPanel.BackColor = [System.Drawing.Color]::Transparent
+$panelDomainJoin.Controls.Add($fieldsPanel)
+
 $labels = @(
     "Domínio do AD:",
     "Tipo de Equipamento:",
     "Unidade Organizacional (OU):",
+    "Descrição do equipamento:",
     "Usuário (dominio\login ou login@dominio):",
     "Senha AD:"
 )
-$y = 5
-$h = 35
+$y = 10
+$h = 32
 $textBoxes = @()
 
 foreach ($txt in $labels) {
@@ -292,6 +591,8 @@ foreach ($txt in $labels) {
         $fieldsPanel.Controls.Add($cbTipo)
         # Tooltip
         $toolTipCbTipo = New-Object System.Windows.Forms.ToolTip
+        $toolTipCbTipo.AutoPopDelay = 20000
+        $toolTipCbTipo.IsBalloon   = $true
         $toolTipCbTipo.SetToolTip($cbTipo, "Informe se o computador é do tipo cliente (ex.: MS Windows 11) ou servidor (ex.: MS Windows Server 2022).")
 
     } elseif ($txt -like "Unidade Organizacional*") {
@@ -308,6 +609,8 @@ foreach ($txt in $labels) {
         $fieldsPanel.Controls.Add($cbOU)
         # Cria Tooltip do campo OU
         $toolTipCbOU = New-Object System.Windows.Forms.ToolTip
+        $toolTipCbOU.AutoPopDelay = 20000
+        $toolTipCbOU.IsBalloon   = $true
         $toolTipCbOU.SetToolTip($cbOU, "Informe a posição no organograma ou o ambiente, conforme o tipo de equipamento (cliente ou servidor).")
 
     } else {
@@ -323,12 +626,30 @@ foreach ($txt in $labels) {
         $fieldsPanel.Controls.Add($tb)
         $textBoxes += $tb
 
-        # Tooltip
+        # Outros Tooltips
         $toolTip = New-Object System.Windows.Forms.ToolTip
-        $toolTip.SetToolTip($tb, $txt.Replace(":", "") + " é obrigatório.")
+        $toolTip.AutoPopDelay = 20000
+        $toolTip.IsBalloon   = $true
+
+        if ($txt -eq "Descrição do equipamento:") {
+            $toolTip.SetToolTip(
+                $tb,
+                "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n" +
+                "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
+                "Exemplos:`n" +
+                "• Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
+                "• Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
+            )
+        }
+        else {
+            $toolTip.SetToolTip(
+                $tb,
+                $txt.Replace(":", "") + " é obrigatório."
+            )
+        }
     }
 
-    $y += 46
+    $y += 42
 }
 
 # Valor padrão para o campo "Domínio"
@@ -358,84 +679,106 @@ $textBoxes[0].Enabled = $domainTxtBoxEnable
 $cbTipo.Enabled       = $tipoCBoxEnable
 
 # Checkbox
-$y += 10
 $chkRestart = New-Object System.Windows.Forms.CheckBox
 $chkRestart.Text = "Reiniciar automaticamente após concluir (recomendado)"
 $chkRestart.Checked = $true
 $chkRestart.Location = [System.Drawing.Point]::new(30, $y)
-$chkRestart.Size = [System.Drawing.Size]::new(460, $h)
+$chkRestart.Size = [System.Drawing.Size]::new(460, 20)
 $chkRestart.Font = [System.Drawing.Font]::new("Segoe UI", 10)
 $chkRestart.ForeColor = [System.Drawing.Color]::FromArgb(80, 80, 80)
 $chkRestart.FlatStyle = "Popup"
-$chkRestart.AutoSize = $false
+$chkRestart.AutoSize = $true
 $fieldsPanel.Controls.Add($chkRestart)
 
 # Botão
-$y = 460
 $btn = New-Object System.Windows.Forms.Button
 $btn.Text = "INGRESSAR NO DOMÍNIO"
+if ($isDomainJoined) {
+    $btn.Text = "APLICAR / MOVER NO DOMÍNIO"
+}
 $btn.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215)
 $btn.ForeColor = [System.Drawing.Color]::White
-$btn.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$btn.Font = [System.Drawing.Font]::new("Segoe UI ", 10, [System.Drawing.FontStyle]::Bold)
 $btn.FlatStyle = "Flat"
 $btn.FlatAppearance.BorderSize = 0
-$btn.Location = [System.Drawing.Point]::new(110, $y)
-$btn.Size = [System.Drawing.Size]::new(280, 50)
+$btn.Size = [System.Drawing.Size]::new(240, 44)
+$btn.Location = [System.Drawing.Point]::new(140, 310)
+$btn.Anchor = 'Bottom'
 $btn.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btn.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
-$form.Controls.Add($btn)
+$panelDomainJoin.Controls.Add($btn)
 
 # Barra de Progresso
-$y += 60
 $progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = [System.Drawing.Point]::new(30, $y)
+$progressBar.Location = [System.Drawing.Point]::new(30, 364)
 $progressBar.Size = [System.Drawing.Size]::new(450, 20)
 $progressBar.Style = "Continuous"
-$progressBar.ForeColor = [System.Drawing.Color]::FromArgb(0, 120, 215)
-$form.Controls.Add($progressBar)
+$progressBar.Anchor = 'Bottom,Left,Right'
+$panelDomainJoin.Controls.Add($progressBar)
 
 # Log
-$y += 30
 $logBox = New-Object System.Windows.Forms.RichTextBox
-$logBox.Location = [System.Drawing.Point]::new(30, $y)
-$logBox.Size = [System.Drawing.Size]::new(450, 180)
-$logBox.Multiline = $true
+$logBox.Location = [System.Drawing.Point]::new(30, 394)
+$logBox.Size = [System.Drawing.Size]::new(450, 165)
+$logBox.BorderStyle = "FixedSingle"
+$logBox.Anchor = 'Bottom,Left,Right'
 $logBox.ReadOnly = $true
 $logBox.ScrollBars = "Vertical"
 $logBox.Font = [System.Drawing.Font]::new("Consolas", 9.5)
 $logBox.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $logBox.ForeColor = [System.Drawing.Color]::Lime
-$logBox.BorderStyle = "FixedSingle"
-$form.Controls.Add($logBox)
+$panelDomainJoin.Controls.Add($logBox)
 
-# Joga o cursor para o campo "Usuário" ao término da criação do formulário e quando este já está visível
-$form.Add_Shown({
-    $textBoxes[1].Focus()
-})
-
-# ==================== EVENTO PRINCIPAL ====================
+# 5. ==================== EVENTO PRINCIPAL ====================
 $btn.Add_Click({
     $btn.Enabled = $false
     $progressBar.Value = 0
     try {
-        $domainFQDN    = $textBoxes[0].Text.Trim()
-        $user          = $textBoxes[1].Text.Trim()
-        $pass          = $textBoxes[2].Text
-        $targetOU      = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["DN"]
-        $targetGroupCN = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["Grupo"]
+        $domainFQDN          = $textBoxes[0].Text.Trim()
+        $computerDescription = $textBoxes[1].Text.Trim()
+        $user                = $textBoxes[2].Text.Trim()
+        $pass                = $textBoxes[3].Text
+        $targetOU            = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["DN"]
+        $targetGroupCN       = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["Grupo"]
 
         if ([string]::IsNullOrEmpty($user) -or [string]::IsNullOrEmpty($pass)) {
-            throw "Preencha os campos obrigatórios!"
+            throw "Preencha o usuário e a senha!"
+        }
+
+        if ([string]::IsNullOrWhiteSpace($computerDescription)) {
+            throw "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
+                  "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
+                  "Exemplos:`n" +
+                  "• Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
+                  "• Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
+        }
+
+        # 1. Lista de TODOS os grupos gerenciados pelo script (Cliente + Servidor)
+        Log "Mapeando todos os grupos do AD gerenciados pelo script associados ao OUMap..."
+        $managedGroups = @()
+
+        foreach ($tipo in $OUMap.Keys) {
+            foreach ($ou in $OUMap[$tipo].Keys) {
+                $grp = $OUMap[$tipo][$ou]["Grupo"]
+                if ($grp -and ($managedGroups -notcontains $grp)) {
+                    $managedGroups += $grp
+                }
+            }
         }
 
         $progressBar.Value = 10
 
-        # Gera o domainRoot a partir do domainFQDN
+        # 2. Gera o domainRoot a partir do domainFQDN
         $domainRoot = (($domainFQDN -split '\.') | ForEach-Object { "DC=$_" }) -join ','
 
         Log "Iniciando processo para $env:COMPUTERNAME..."
 
-        # 1. Descobre DC
+        # 3. Caso já esteja no Domínio
+        if ($isDomainJoined) {
+            Log "Computador já estava no domínio. Reaplicando associação e movendo para OU..." "Yellow"
+        }
+
+        # 4. Descobre DC
         Log "Consultando DNS para DCs em $domainFQDN..." "Cyan"
         $srvRecords = Resolve-DnsName -Name "_ldap._tcp.dc._msdcs.$domainFQDN" -Type SRV -ErrorAction SilentlyContinue | Where-Object { $_.Type -eq 'SRV' } | Sort-Object Priority, { - $_.Weight }
         $DCList = $srvRecords | Select-Object -ExpandProperty NameTarget -ErrorAction SilentlyContinue
@@ -460,18 +803,18 @@ $btn.Add_Click({
 
         $progressBar.Value = 20
 
-        # 2. Preparar credenciais
+        # 5. Preparar credenciais
         $SecurePassword = ConvertTo-SecureString $pass -AsPlainText -Force
         $Cred = New-Object System.Management.Automation.PSCredential($user, $SecurePassword)
 
-        # 3. Ingressar no domínio
+        # 6. Ingressar no domínio
         Log "Ingressando '$computerName' no domínio '$DomainName' via DC '$SelectedDC'..." "Cyan"
         Add-Computer -DomainName $domainFQDN -Server $SelectedDC -Credential $Cred -ErrorAction Stop -Force
         Log "Ingresso concluído!" "Lime"
 
         $progressBar.Value = 40
 
-        # 4. Move para OU
+        # 7. Move para OU
         Log "Aguardando tempo de replicação local do DC... (5 segundos)" "Cyan"
         Start-Sleep -Seconds 5
 
@@ -512,7 +855,41 @@ $btn.Add_Click({
 
             $progressBar.Value = 80
 
-            # Adiciona ao grupo
+            # 8. Remove o computador de TODOS os grupos gerenciados pelo script
+            Log "Sincronizando grupos conforme OU selecionada..." "Cyan"
+            $removedAnyGroup = $false
+
+            foreach ($grpCN in $managedGroups) {
+
+                # Não remove ainda do grupo alvo (evita remove + add desnecessário)
+                if ($grpCN -eq $targetGroupCN) { continue }
+
+                $groupCleanSearcher = New-Object System.DirectoryServices.DirectorySearcher
+                $groupCleanSearcher.SearchRoot = $root
+                $groupCleanSearcher.Filter = "(&(objectCategory=group)(cn=$grpCN))"
+                $groupCleanSearcher.PropertiesToLoad.Add("distinguishedName") | Out-Null
+
+                $groupCleanResult = $groupCleanSearcher.FindOne()
+
+                if ($groupCleanResult) {
+                    $grpDN = $groupCleanResult.Properties["distinguishedName"][0]
+                    $grpDE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$SelectedDC/$grpDN", $user, $pass)
+                    try {
+                        $grpDE.Invoke("Remove", $computer.ADsPath)
+                        $grpDE.CommitChanges()
+                        Log "Removido do grupo antigo: $grpCN" "Yellow"
+                        $removedAnyGroup = $true
+                    }
+                    catch {
+                        # Ignora se não for membro
+                    }
+                }
+            }
+            if (-not $removedAnyGroup) {
+                Log "Nenhum grupo antigo gerenciado encontrado para remoção." "Gray"
+            }
+
+            # 9. Adiciona ao grupo
             Log "Adicionando '$computerName' no grupo selecionado..." "Cyan"
 
             # Cria um searcher para o grupo baseado no CN
@@ -534,7 +911,7 @@ $btn.Add_Click({
                     $group.CommitChanges()
                     Log "O computador $computerName foi adicionado ao grupo: $targetGroupDN" "Lime"
                     Start-Sleep -Seconds 2
-                    $progressBar.Value = 100
+                    $progressBar.Value = 90
                 }
                 catch {
                     $errCode = $_.Exception.HResult
@@ -542,7 +919,7 @@ $btn.Add_Click({
                         # 0x80071392 = já existe
                         Log "Computador JÁ faz parte do grupo '$targetGroupCN' (ignorando)" "Yellow"
                         Start-Sleep -Seconds 2
-                        $progressBar.Value = 100
+                        $progressBar.Value = 90
                     }
                     else {
                         throw $_  # outros erros são reais ? mostra em vermelho
@@ -556,9 +933,36 @@ $btn.Add_Click({
             throw "Computador $computerName não encontrado no domínio."
         }
 
+        # 10. Atualiza descrição do computador no AD
+        Log "Atualizando descrição do computador no Active Directory..." "Cyan"
+
+        $computer.Properties["description"].Value = $computerDescription
+        $computer.CommitChanges()
+
+        Log "Descrição aplicada no AD (description):" "Lime"
+        Log " → $computerDescription" "Cyan"
+
+        Start-Sleep -Seconds 1
+        $progressBar.Value = 95
+
+        # 11. Atualiza descrição local do Windows
+        Log "Atualizando descrição local do Windows..." "Cyan"
+
+        Set-ItemProperty `
+          -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" `
+          -Name "srvcomment" `
+          -Value $computerDescription `
+          -Force
+
+        Log "Descrição aplicada no registro:" "Lime"
+        Log " → $computerDescription" "Cyan"
+
+        Start-Sleep -Seconds 1
+        $progressBar.Value = 100
+
      if ($chkRestart.Checked) {
-         [System.Windows.Forms.MessageBox]::Show("Tudo feito com sucesso!`nA máquina será reiniciada em 5 segundos.", "Sucesso", 0, 64)
-         Start-Sleep -Seconds 5
+         [System.Windows.Forms.MessageBox]::Show("Tudo feito com sucesso!`nA máquina será reiniciada em 10 segundos.", "Sucesso", 0, 64)
+         Start-Sleep -Seconds 10
          Restart-Computer -Force
      } else {
             Log "Reinicie para aplicar totalmente." "Yellow"
@@ -576,4 +980,22 @@ $btn.Add_Click({
 
 Log "Aplicativo iniciado - pronto para uso." "Lime"
 
+# Alerta antes se está no domínio
+if ($isDomainJoined) {
+    [System.Windows.Forms.MessageBox]::Show(
+        "Este computador já está ingressado no domínio:`n`n$currentDomain`n`n" +
+        "Você pode continuar para mover o computador para outra OU ou reparar a associação ao domínio.",
+        "Computador já ingressado no domínio",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+    )
+}
+
+$form.Controls.AddRange(@(
+    $panelWelcome,
+    $panelHostname,
+    $panelDomainJoin
+))
+
+Show-Step 'Welcome'
 $form.ShowDialog()
