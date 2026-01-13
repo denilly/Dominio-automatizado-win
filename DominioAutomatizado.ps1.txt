@@ -293,11 +293,22 @@ function Rename-ComputerAndReboot {
         [string]$NewName,
 
         [System.Management.Automation.PSCredential]
-        $DomainCredential = $null
+        $DomainCredential = $null,
+
+        [bool]$IsDomainJoined
     )
 
-    $msg = "A máquina será reiniciada imediatamente e renomeada para:`n$NewName`n`n" +
-           "Após reiniciar, execute novamente o Domínio Automatizado."
+    if ($isDomainJoined) {
+        $msg =
+        "A máquina será reiniciada imediatamente e renomeada para:`n$NewName`n`n" +
+        "O computador permanecerá ingressado no domínio.`n" +
+        "Execute novamente o Domínio Automatizado apenas se for necessário mover o equipamento para outra OU ou atualizar grupos."
+    }
+    else {
+        $msg =
+        "A máquina será reiniciada imediatamente e renomeada para:`n$NewName`n`n" +
+        "Após reiniciar, execute novamente o Domínio Automatizado para ingressar o computador no domínio."
+    }
 
     $res = [System.Windows.Forms.MessageBox]::Show(
         $msg,
@@ -504,11 +515,11 @@ $btnHostNext.Add_Click({
             if (-not $cred) {
                 return
             }
-            Rename-ComputerAndReboot -NewName $txtHostname.Text -DomainCredential $cred
+            Rename-ComputerAndReboot -NewName $txtHostname.Text -DomainCredential $cred -IsDomainJoined $isDomainJoined
         }
         else {
             # Máquina fora do domínio
-            Rename-ComputerAndReboot -NewName $txtHostname.Text
+            Rename-ComputerAndReboot -NewName $txtHostname.Text -IsDomainJoined $isDomainJoined
         }
     }
     else {
@@ -984,7 +995,13 @@ Log "Aplicativo iniciado - pronto para uso." "Lime"
 if ($isDomainJoined) {
     [System.Windows.Forms.MessageBox]::Show(
         "Este computador já está ingressado no domínio:`n`n$currentDomain`n`n" +
-        "Você pode continuar para mover o computador para outra OU ou reparar a associação ao domínio.",
+        "Você pode continuar utilizando este assistente para:" +
+        "`n• Mover o computador para outra OU" +
+        "`n• Ajustar grupos de segurança" +
+        "`n• Atualizar a descrição do equipamento" +
+        "`n• Reparar a associação ao domínio`n`n" +
+        "Observação: para remover um computador do domínio e movê-lo para um grupo de trabalho, " +
+        "utilize as Propriedades do Sistema do Windows ou siga os procedimentos padrão de TIC.",
         "Computador já ingressado no domínio",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information
