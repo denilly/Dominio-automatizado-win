@@ -26,7 +26,7 @@ Script para automatizar o ingresso de computadores no domínio Active Directory,
 > * Interface gráfica em formato **Wizard** (GUI moderna).
 > * Logs detalhados em tempo real.
 > * Compatível com PowerShell 5.1 e PowerShell 7+.
-> * Detecção automática de Domain Controllers via LDAPS.
+> * Comunicação segura com o Active Directory utilizando **LDAPS (SSL/TLS)** sempre que disponível.
 
 ---
 
@@ -47,13 +47,15 @@ Script para automatizar o ingresso de computadores no domínio Active Directory,
 
 Este script é fornecido "**como está**" e pode ser utilizado e modificado por terceiros, desde que os **créditos ao autor sejam mantidos**. Para uso em projetos, por favor, faça referência a este script e ao autor.
 
-* O campo **Descrição do equipamento** segue padrão institucional e é aplicado:
-  * Localmente no Windows (System Properties).
-  * No atributo `description` do objeto do computador no Active Directory.
+* O campo **Descrição do equipamento** segue padrão institucional e é fundamental para:
+  * Inventário e auditoria de ativos.
+  * Identificação rápida de localização e função do equipamento.
+  * Padronização e organização do Active Directory.
 
 ### Importante
 
-* O script é executado diretamente e abre uma **interface gráfica** para preenchimento de campos obrigatórios (ex.: domínio, usuário, senha, tipo de equipamento e OU).
+* O script é executado diretamente e abre uma **interface gráfica** para preenchimento de campos obrigatórios (ex.: domínio, tipo de equipamento, OU e descrição do equipamento).
+* As credenciais de domínio são solicitadas de forma segura pelo Windows (`Get-Credential`), não sendo digitadas diretamente na interface.
 * Não requer argumentos de linha de comando, mas pode ser adaptado para execução silenciosa se necessário.
 * Ajuste as configurações iniciais no código-fonte (ex.: mapeamento de OUs e grupos) conforme o seu ambiente Active Directory.
 * Logs são exibidos na interface gráfica durante a execução para monitoramento em tempo real.
