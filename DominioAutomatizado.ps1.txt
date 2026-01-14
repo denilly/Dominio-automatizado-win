@@ -209,7 +209,7 @@ function Log {
 function Test-LdapsFast {
     param(
         [string]$TargetHost,
-        [int]$Port = 636,
+        [int]$Port,
         [int]$TimeoutMs = 1500
     )
     try {
@@ -565,9 +565,7 @@ $labels = @(
     "Domínio do AD:",
     "Tipo de Equipamento:",
     "Unidade Organizacional (OU):",
-    "Descrição do equipamento:",
-    "Usuário (dominio\login ou login@dominio):",
-    "Senha AD:"
+    "Descrição do equipamento:"
 )
 $y = 10
 $h = 32
@@ -633,7 +631,6 @@ foreach ($txt in $labels) {
         $tb.Font = New-Object System.Drawing.Font("Segoe UI", 9)
         $tb.BackColor = "White"
         $tb.BorderStyle = "FixedSingle"
-        if ($txt -like "*Senha*") { $tb.UseSystemPasswordChar = $true }
         $fieldsPanel.Controls.Add($tb)
         $textBoxes += $tb
 
@@ -747,14 +744,10 @@ $btn.Add_Click({
     try {
         $domainFQDN          = $textBoxes[0].Text.Trim()
         $computerDescription = $textBoxes[1].Text.Trim()
-        $user                = $textBoxes[2].Text.Trim()
-        $pass                = $textBoxes[3].Text
         $targetOU            = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["DN"]
         $targetGroupCN       = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["Grupo"]
 
-        if ([string]::IsNullOrEmpty($user) -or [string]::IsNullOrEmpty($pass)) {
-            throw "Preencha o usuário e a senha!"
-        }
+        [int]$PortLDAPS       = 636
 
         if ([string]::IsNullOrWhiteSpace($computerDescription)) {
             throw "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
@@ -764,7 +757,32 @@ $btn.Add_Click({
                   "• Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
         }
 
-        # 1. Lista de TODOS os grupos gerenciados pelo script (Cliente + Servidor)
+        # 1. Obtém credenciais de forma segura e armazena em memória para uso somente no contexto do script
+        if (-not $script:DomainCred) {
+            $lines = @(
+                "Informe uma credencial de domínio com permissão para:"
+                "• Ingressar computadores no domínio"
+                "• Renomear o computador"
+                "• Mover OUs"
+                "• Gerenciar grupos"
+            )
+
+            $Message = $lines -join [Environment]::NewLine
+            
+            Log "Aguardando credencial de domínio..." "Yellow"
+
+            $script:DomainCred = Get-Credential -Message $Message
+    
+            if (-not $script:DomainCred) {
+                Log "Operação cancelada: credencial não informada." "Red"
+                return
+            }
+        }
+
+        # Armazena credencial segura para uso pelo DirectoryEntry/LDAP, por não aceitar PSCredential
+        $script:NetCred = $script:DomainCred.GetNetworkCredential()
+
+        # 2. Lista de TODOS os grupos gerenciados pelo script (Cliente + Servidor)
         Log "Mapeando todos os grupos do AD gerenciados pelo script associados ao OUMap..."
         $managedGroups = @()
 
@@ -779,17 +797,17 @@ $btn.Add_Click({
 
         $progressBar.Value = 10
 
-        # 2. Gera o domainRoot a partir do domainFQDN
+        # 3. Gera o domainRoot a partir do domainFQDN
         $domainRoot = (($domainFQDN -split '\.') | ForEach-Object { "DC=$_" }) -join ','
 
         Log "Iniciando processo para $env:COMPUTERNAME..."
 
-        # 3. Caso já esteja no Domínio
+        # 4. Caso já esteja no Domínio
         if ($isDomainJoined) {
             Log "Computador já estava no domínio. Reaplicando associação e movendo para OU..." "Yellow"
         }
 
-        # 4. Descobre DC
+        # 5. Descobre DC
         Log "Consultando DNS para DCs em $domainFQDN..." "Cyan"
         $srvRecords = Resolve-DnsName -Name "_ldap._tcp.dc._msdcs.$domainFQDN" -Type SRV -ErrorAction SilentlyContinue | Where-Object { $_.Type -eq 'SRV' } | Sort-Object Priority, { - $_.Weight }
         $DCList = $srvRecords | Select-Object -ExpandProperty NameTarget -ErrorAction SilentlyContinue
@@ -799,7 +817,7 @@ $btn.Add_Click({
         $SelectedDC = $null
         foreach ($dc in $DCList) {
             Log "Testando LDAPS em $dc ..." "Cyan"
-            if (Test-LdapsFast -TargetHost $dc) {
+            if (Test-LdapsFast -TargetHost $dc -Port $PortLDAPS) {
                 Log "LDAPS OK em $dc"
                 $SelectedDC = $dc
                 break
@@ -814,13 +832,9 @@ $btn.Add_Click({
 
         $progressBar.Value = 20
 
-        # 5. Preparar credenciais
-        $SecurePassword = ConvertTo-SecureString $pass -AsPlainText -Force
-        $Cred = New-Object System.Management.Automation.PSCredential($user, $SecurePassword)
-
         # 6. Ingressar no domínio
         Log "Ingressando '$computerName' no domínio '$DomainName' via DC '$SelectedDC'..." "Cyan"
-        Add-Computer -DomainName $domainFQDN -Server $SelectedDC -Credential $Cred -ErrorAction Stop -Force
+        Add-Computer -DomainName $domainFQDN -Server $SelectedDC -Credential $script:DomainCred -ErrorAction Stop -Force
         Log "Ingresso concluído!" "Lime"
 
         $progressBar.Value = 40
@@ -833,8 +847,14 @@ $btn.Add_Click({
 
         Log "Movendo '$computerName' para a OU selecionada..." "Cyan"
 
-        # Cria o DirectoryEntry para a raiz do domínio com credenciais e DC
-        $root = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$SelectedDC/$DomainRoot", $user, $pass)
+        # Define os tipos de autenticação (Secure + SecureSocketsLayer)
+        # O uso de 'Secure' garante autenticação segura e 'SecureSocketsLayer' ativa o SSL/TLS
+        $authSecure = [System.DirectoryServices.AuthenticationTypes]::Secure -bor 
+                      [System.DirectoryServices.AuthenticationTypes]::SecureSocketsLayer
+
+        # Cria o DirectoryEntry para a raiz do domínio com credenciais seguras e DC
+        $net = $script:DomainCred.GetNetworkCredential()
+        $root = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$DomainRoot", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
 
         # Cria um searcher com o root especificado
         $compSearcher = New-Object System.DirectoryServices.DirectorySearcher
@@ -850,10 +870,10 @@ $btn.Add_Click({
             $dn = $compResult.Properties["distinguishedName"][0]
 
             # Bind ao objeto do computador com credenciais e DC
-            $computer = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$SelectedDC/$dn", $user, $pass)
+            $computer = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$dn", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
 
             # Bind à OU de destino com credenciais e DC
-            $newParent = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$SelectedDC/$targetOU", $user, $pass)
+            $newParent = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$targetOU", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
 
             # Move o objeto para a nova OU usando MoveTo (sem renomear)
             $computer.MoveTo($newParent)
@@ -884,7 +904,7 @@ $btn.Add_Click({
 
                 if ($groupCleanResult) {
                     $grpDN = $groupCleanResult.Properties["distinguishedName"][0]
-                    $grpDE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$SelectedDC/$grpDN", $user, $pass)
+                    $grpDE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$grpDN", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
                     try {
                         $grpDE.Invoke("Remove", $computer.ADsPath)
                         $grpDE.CommitChanges()
@@ -915,8 +935,8 @@ $btn.Add_Click({
 
             if ($groupResult -ne $null) {
                 $targetGroupDN = $groupResult.Properties["distinguishedName"][0]
-                $group = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$SelectedDC/$targetGroupDN", $user, $pass)
-                
+                $group = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$targetGroupDN", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
+
                 try {
                     $group.Invoke("Add", $computer.ADsPath)
                     $group.CommitChanges()
@@ -984,6 +1004,7 @@ $btn.Add_Click({
      Log "ERRO: $($_.Exception.Message)" "Red"
      [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Erro", 0, 16)
  } finally {
+     $script:DomainCred = $null
      $btn.Enabled = $true
      $progressBar.Value = 0
  }
