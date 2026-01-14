@@ -6,7 +6,7 @@
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg)
 
 <p align="center">
- <img width="400" alt="Formulário de inserção no domínio" src="https://github.com/user-attachments/assets/9dfa0b14-3826-4419-9bd9-c85ed09003c8" />
+ <img width="400" alt="Formulário de inserção no domínio" src="https://github.com/user-attachments/assets/27ce2a77-2903-40cc-931f-cc0e290ced71" />
 </p>
 
 ## Descrição
