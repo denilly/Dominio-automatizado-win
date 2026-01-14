@@ -340,7 +340,7 @@ function Rename-ComputerAndReboot {
 # 4. ==================== FORMULÁRIO - GUI ====================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $TextForm
-$form.Size = [System.Drawing.Size]::new(520, 780)
+$form.Size = [System.Drawing.Size]::new(520, 720)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -358,7 +358,7 @@ $panelDomainJoin.Dock = 'None'
 
 foreach ($panel in @($panelWelcome, $panelHostname, $panelDomainJoin)) {
     $panel.Location = [System.Drawing.Point]::new(0, 171)
-    $panel.Size     = [System.Drawing.Size]::new(520, 609)
+    $panel.Size     = [System.Drawing.Size]::new(520, 529)
     $panel.Visible  = $false
 }
 
@@ -405,7 +405,7 @@ $lblWelcome.Text =
 "Bem-vindo ao Domínio Automatizado`n" +
 "Este assistente irá guiá-lo passo a passo.`n`n"
 $lblWelcome.AutoSize = $true
-$lblWelcome.Location = '30,100'
+$lblWelcome.Location = '30,80'
 $lblWelcome.Font = [System.Drawing.Font]::new("Segoe UI", 11)
 
 $lblWelcomeInfo = New-Object System.Windows.Forms.Label
@@ -417,7 +417,7 @@ $lblWelcomeInfo.Text =
 "• Associar automaticamente aos grupos adequados`n" +
 "• Definir a descrição do equipamento no Active Directory e localmente"
 $lblWelcomeInfo.AutoSize = $true
-$lblWelcomeInfo.Location = '30,160'
+$lblWelcomeInfo.Location = '30,140'
 $lblWelcomeInfo.Font = [System.Drawing.Font]::new("Segoe UI", 10)
 
 $btnWelcomeNext = New-Object System.Windows.Forms.Button
@@ -428,7 +428,7 @@ $btnWelcomeNext.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawin
 $btnWelcomeNext.FlatStyle = "Flat"
 $btnWelcomeNext.FlatAppearance.BorderSize = 0
 $btnWelcomeNext.Anchor = 'Bottom,Right'
-$btnWelcomeNext.Location = [System.Drawing.Point]::new(340, 510)
+$btnWelcomeNext.Location = [System.Drawing.Point]::new(340, 450)
 $btnWelcomeNext.Size = '140,40'
 $btnWelcomeNext.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btnWelcomeNext.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -446,26 +446,26 @@ $panelWelcome.Controls.AddRange(@(
 $lblHost = New-Object System.Windows.Forms.Label
 $lblHost.Text = "Deseja alterar o nome do computador?"
 $lblHost.AutoSize = $true
-$lblHost.Location = '30,100'
+$lblHost.Location = '30,80'
 $lblHost.Font = [System.Drawing.Font]::new("Segoe UI", 11)
 
 $rbHostYes = New-Object System.Windows.Forms.RadioButton
 $rbHostYes.Text = 'Sim, alterar o nome do computador'
 $rbHostYes.Font = [System.Drawing.Font]::new("Segoe UI", 10)
 $rbHostYes.FlatStyle = "Flat"
-$rbHostYes.Location = '30,140'
+$rbHostYes.Location = '30,120'
 $rbHostYes.AutoSize = $true
 
 $rbHostNo = New-Object System.Windows.Forms.RadioButton
 $rbHostNo.Text = 'Não, manter o nome atual'
 $rbHostNo.Font = [System.Drawing.Font]::new("Segoe UI", 10)
 $rbHostNo.FlatStyle = "Flat"
-$rbHostNo.Location = '30,170'
+$rbHostNo.Location = '30,150'
 $rbHostNo.Checked = $true
 $rbHostNo.AutoSize = $true
 
 $txtHostname = New-Object System.Windows.Forms.TextBox
-$txtHostname.Location = '50,210'
+$txtHostname.Location = '50,190'
 $txtHostname.Width = 200
 $txtHostname.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 $txtHostname.BackColor = "White"
@@ -485,7 +485,7 @@ $btnHostNext.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.F
 $btnHostNext.FlatStyle = "Flat"
 $btnHostNext.FlatAppearance.BorderSize = 0
 $btnHostNext.Anchor = 'Bottom,Right'
-$btnHostNext.Location = [System.Drawing.Point]::new(340, 510)
+$btnHostNext.Location = [System.Drawing.Point]::new(340, 450)
 $btnHostNext.Size = '140,40'
 $btnHostNext.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btnHostNext.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -535,7 +535,7 @@ $btnHostBack.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.F
 $btnHostBack.FlatStyle = "Flat"
 $btnHostBack.FlatAppearance.BorderSize = 0
 $btnHostBack.Anchor = 'Bottom,Left'
-$btnHostBack.Location = [System.Drawing.Point]::new(30, 510)
+$btnHostBack.Location = [System.Drawing.Point]::new(30, 450)
 $btnHostBack.Size = '140,40'
 $btnHostBack.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btnHostBack.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -556,7 +556,7 @@ $panelHostname.Controls.AddRange(@(
 # Painel Campos do Domain Join
 $fieldsPanel = New-Object System.Windows.Forms.Panel
 $fieldsPanel.Location = [System.Drawing.Point]::new(0, 10)
-$fieldsPanel.Size = [System.Drawing.Size]::new(520, 280)
+$fieldsPanel.Size = [System.Drawing.Size]::new(520, 210)
 $fieldsPanel.Anchor = 'Top,Left,Right'
 $fieldsPanel.BackColor = [System.Drawing.Color]::Transparent
 $panelDomainJoin.Controls.Add($fieldsPanel)
@@ -578,7 +578,7 @@ foreach ($txt in $labels) {
     $lbl.Text = $txt
     $lbl.Location = New-Object System.Drawing.Point(30, $y)
     $lbl.Size = New-Object System.Drawing.Size(230, $h)
-    $lbl.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $lbl.Font = New-Object System.Drawing.Font("Segoe UI", 10)
     $lbl.ForeColor = [System.Drawing.Color]::FromArgb(80, 80, 80)
     $fieldsPanel.Controls.Add($lbl)
 
@@ -645,8 +645,8 @@ foreach ($txt in $labels) {
                 "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n" +
                 "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
                 "Exemplos:`n" +
-                "• Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
-                "• Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
+                "• Para Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
+                "• Para Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
             )
         }
         else {
@@ -710,7 +710,7 @@ $btn.Font = [System.Drawing.Font]::new("Segoe UI ", 10, [System.Drawing.FontStyl
 $btn.FlatStyle = "Flat"
 $btn.FlatAppearance.BorderSize = 0
 $btn.Size = [System.Drawing.Size]::new(240, 44)
-$btn.Location = [System.Drawing.Point]::new(140, 310)
+$btn.Location = [System.Drawing.Point]::new(140, 230)
 $btn.Anchor = 'Bottom'
 $btn.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btn.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -718,7 +718,7 @@ $panelDomainJoin.Controls.Add($btn)
 
 # Barra de Progresso
 $progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = [System.Drawing.Point]::new(30, 364)
+$progressBar.Location = [System.Drawing.Point]::new(30, 284)
 $progressBar.Size = [System.Drawing.Size]::new(450, 20)
 $progressBar.Style = "Continuous"
 $progressBar.Anchor = 'Bottom,Left,Right'
@@ -726,13 +726,13 @@ $panelDomainJoin.Controls.Add($progressBar)
 
 # Log
 $logBox = New-Object System.Windows.Forms.RichTextBox
-$logBox.Location = [System.Drawing.Point]::new(30, 394)
-$logBox.Size = [System.Drawing.Size]::new(450, 165)
+$logBox.Location = [System.Drawing.Point]::new(30, 314)
+$logBox.Size = [System.Drawing.Size]::new(450, 180)
 $logBox.BorderStyle = "FixedSingle"
 $logBox.Anchor = 'Bottom,Left,Right'
 $logBox.ReadOnly = $true
 $logBox.ScrollBars = "Vertical"
-$logBox.Font = [System.Drawing.Font]::new("Consolas", 9.5)
+$logBox.Font = [System.Drawing.Font]::new("Consolas", 10)
 $logBox.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $logBox.ForeColor = [System.Drawing.Color]::Lime
 $panelDomainJoin.Controls.Add($logBox)
@@ -753,8 +753,8 @@ $btn.Add_Click({
             throw "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
                   "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
                   "Exemplos:`n" +
-                  "• Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
-                  "• Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
+                  "• Para Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
+                  "• Para Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
         }
 
         # 1. Obtém credenciais de forma segura e armazena em memória para uso somente no contexto do script
