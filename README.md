@@ -111,7 +111,7 @@ Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
 > O script verifica automaticamente se está sendo executado como **Administrador**.  
 > Caso contrário, a execução será interrompida com uma mensagem de aviso.
 
-> Isso abrirá a interface gráfica. Siga todo o passo a passo, preencha os campos e clique em "INGRESSAR NO DOMÍNIO". O script executará as etapas automaticamente, exibindo logs na tela.
+> Ao executar o script, será aberta uma interface gráfica. Siga todo o passo a passo, preencha os campos e clique em "INGRESSAR NO DOMÍNIO". O script executará as etapas automaticamente, exibindo logs na tela.
 
 ---
 
