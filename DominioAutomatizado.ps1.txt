@@ -727,7 +727,7 @@ $panelDomainJoin.Controls.Add($progressBar)
 # Log
 $logBox = New-Object System.Windows.Forms.RichTextBox
 $logBox.Location = [System.Drawing.Point]::new(30, 314)
-$logBox.Size = [System.Drawing.Size]::new(450, 180)
+$logBox.Size = [System.Drawing.Size]::new(450, 185)
 $logBox.BorderStyle = "FixedSingle"
 $logBox.Anchor = 'Bottom,Left,Right'
 $logBox.ReadOnly = $true
@@ -1037,3 +1037,4 @@ $form.Controls.AddRange(@(
 
 Show-Step 'Welcome'
 $form.ShowDialog()
+
