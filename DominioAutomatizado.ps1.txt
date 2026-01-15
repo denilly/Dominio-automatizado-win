@@ -992,8 +992,8 @@ $btn.Add_Click({
         $progressBar.Value = 100
 
      if ($chkRestart.Checked) {
-         [System.Windows.Forms.MessageBox]::Show("Tudo feito com sucesso!`nA máquina será reiniciada em 10 segundos.", "Sucesso", 0, 64)
-         Start-Sleep -Seconds 10
+         [System.Windows.Forms.MessageBox]::Show("Tudo feito com sucesso!`nA máquina será reiniciada em 5 segundos após OK.", "Sucesso", 0, 64)
+         Start-Sleep -Seconds 5
          Restart-Computer -Force
      } else {
             Log "Reinicie para aplicar totalmente." "Yellow"
@@ -1037,4 +1037,5 @@ $form.Controls.AddRange(@(
 
 Show-Step 'Welcome'
 $form.ShowDialog()
+
 
