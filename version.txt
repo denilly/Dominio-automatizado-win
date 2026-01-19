@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 0, 0),
-    prodvers=(2, 0, 0, 0),
+    filevers=(2, 1, 0, 0),
+    prodvers=(2, 1, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -17,15 +17,16 @@ VSVersionInfo(
         [
           StringStruct('CompanyName', 'Contoso'),
           StringStruct('FileDescription', 'Automatiza ingresso no domínio AD. Empacotado com Python (auto-py-to-exe).'),
-          StringStruct('FileVersion', '2.0.0'),
+          StringStruct('FileVersion', '2.1.0'),
           StringStruct('InternalName', 'DominioAutomatizado.exe'),
           StringStruct('LegalCopyright', '© 2026 Contoso'),
           StringStruct('OriginalFilename', 'DominioAutomatizado.exe'),
           StringStruct('ProductName', 'Domínio Automatizado'),
-          StringStruct('ProductVersion', '2.0.0')
+          StringStruct('ProductVersion', '2.1.0')
         ]
       )
     ]),
     VarFileInfo([VarStruct('Translation', [1046, 65001])])
   ]
 )
+
