@@ -1,44 +1,86 @@
 <#
 Este é um script PowerShell
 ---------------------------------------------------------------------------------
-Nome do arquivo de script: DominioAutomatizado.ps1
-Descrição: Esse script automatiza três etapas essenciais no gerenciamento de 
-           computadores via Active Directory: ele ingressa a máquina no domínio, 
-           move o objeto para a Unidade Organizacional (OU) definida e adiciona 
-           o computador ao grupo especificado, garantindo que a estrutura 
-           hierárquica e as políticas de segurança sejam aplicadas corretamente. 
-           Compatível em ambiente MS Windows (PowerShell 5.1 e 7+).
-Autor: Denilly Carvalho do Carmo
-Data de Criação: 11/12/2025
-Projeto: https://github.com/denilly/Dominio-automatizado-win
-Copyright (c) 2025 Denilly Carvalho do Carmo. Todos os direitos reservados.
-Licença: GNU General Public License (GPL) versão 3
-Versão: 2.0
+Nome do arquivo de script: DominioAutomatizado_v2.1.ps1
 
-NOTAS: Este script é fornecido "como está" e pode ser utilizado e modificado por 
-terceiros, desde que os créditos ao autor sejam mantidos. Para uso em projetos, 
-por favor, faça referência a este script e ao autor.
+Descrição:
+Este script automatiza e padroniza o processo de ingresso e gerenciamento de
+computadores no Active Directory por meio de uma interface gráfica (GUI).
+Ele executa, de forma segura e controlada, as seguintes etapas:
 
-IMPORTANTE: Execute este script diretamente e abrirá uma interface gráfica
-            com os campos necessários para preenchimento. Opcionalmente, este 
-            script poderá ser empacotado em .EXE.
+• Ingresso do computador no domínio Active Directory
+• Seleção automática de um Domain Controller disponível
+• Suporte a LDAPS (636) com fallback automático para LDAP seguro (389 + signing)
+• Movimentação do objeto computador para a Unidade Organizacional (OU) definida
+• Sincronização de grupos de segurança conforme a OU selecionada
+• Atualização da descrição do computador no Active Directory
+• Atualização da descrição local do Windows
+• Geração de log visual em tempo real (GUI)
+• Geração opcional de log em arquivo, com escolha do diretório de salvamento
+• Controle seguro de credenciais em memória (limpeza garantida)
+• Opção controlada de reinicialização do computador ao final do processo
+
+O script foi projetado para funcionar mesmo em máquinas recém-instaladas,
+sem necessidade prévia de RSAT ou certificado de CA instalado localmente,
+utilizando fallback inteligente de conexão LDAP quando necessário.
+
+Compatibilidade:
+• Microsoft Windows
+• PowerShell 5.1 e PowerShell 7+
+• Não requer RSAT obrigatoriamente
+
+Autor:
+Denilly Carvalho do Carmo
+
+Data de Criação:
+11/12/2025
+
+Projeto:
+https://github.com/denilly/Dominio-automatizado-win
+
+Copyright:
+Copyright (c) 2026 Denilly Carvalho do Carmo.
+Todos os direitos reservados.
+
+Licença:
+GNU General Public License (GPL) versão 3
+
+Versão:
+2.1
+
+NOTAS:
+Este script é fornecido "como está", sem garantias implícitas ou explícitas.
+Pode ser utilizado, modificado e redistribuído por terceiros, desde que os
+créditos ao autor original sejam mantidos, conforme os termos da licença GPL v3.
+
+IMPORTANTE:
+Ao executar este script, será aberta uma interface gráfica para preenchimento
+dos dados necessários. Opcionalmente, este script pode ser empacotado em formato
+.EXE para distribuição interna.
 
 COMO USAR:
-1. Crie o arquivo do script com o seu editor preferido usando codificação de caracteres UTF-8
-   com BOM para compatibilidade com Powershell 5.1 e 7+:
-   > notepad C:\path\to\script\DominioAutomatizado.ps1
-2. Cole o código deste arquivo no editor, ajustes os parâmetros comentados com "<--" (quando  
-   necessário) e salve o arquivo.
-3. Checar políticas de execução de scripts no PowerShell, e, se necessário, ajustar conforme 
-   política interna:
+1. Crie o arquivo do script utilizando um editor de sua preferência, garantindo
+   codificação UTF-8 com BOM (necessário para compatibilidade com PowerShell 5.1):
+   > notepad C:\path\to\script\DominioAutomatizado_v2.1.ps1
+
+2. Cole o código completo do script no editor, ajuste os parâmetros indicados
+   nos comentários (quando aplicável) com "<--" e salve o arquivo.
+
+3. Verifique a política de execução de scripts no PowerShell e ajuste conforme
+   a política interna da organização, se necessário:
    > Get-ExecutionPolicy -List
    > Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy RemoteSigned -Force
+
 4. Execute o script:
-   > .\DominioAutomatizado.ps1
+   > .\DominioAutomatizado_v2.1.ps1
+
+5. Alternativamente, para ignorar a política de executação de scripts e executar
+   diretamente:
+   > powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\DominioAutomatizado_v2.1.ps1
 ---------------------------------------------------------------------------------
 #>
 #  1. ===================== CONFIGURAÇÕES GERAIS - AJUSTE CONFORME AMBIENTE =====================
-$ScriptVersion = '2.0'
+$ScriptVersion = '2.1'
 $ScriptRevision = '01/2026'
 $LicencaGPL = 'GPL-3.0'
 
@@ -129,12 +171,15 @@ Exemplo #>
 # ----------------------------------------------------------------------------------------------
 # NÃO ALTERE A PARTIR DAQUI!!!
 # ----------------------------------------------------------------------------------------------
+# Registra os mapas de OU para Cliente e Servidor
 $OUMap.Add("Cliente", $clienteMap)
 $OUMap.Add("Servidor", $servidorMap)
 
+# Carrega bibliotecas de interface gráfica (Windows Forms e Drawing)
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Força erros a interromperem o script
 $ErrorActionPreference = 'Stop'
 
 # Obtém o hostname atual
@@ -145,27 +190,8 @@ $computerSystem = Get-CimInstance Win32_ComputerSystem
 $isDomainJoined = $computerSystem.PartOfDomain
 $currentDomain  = $computerSystem.Domain
 
-# Verifica se o script está sendo executado como Administrador
-$principal = New-Object Security.Principal.WindowsPrincipal(
-    [Security.Principal.WindowsIdentity]::GetCurrent()
-)
-
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-
-    [System.Windows.Forms.MessageBox]::Show(
-        "Este aplicativo precisa ser executado como Administrador.`n`n" +
-        "Clique com o botão direito no arquivo e selecione:`n" +
-        "'Executar como administrador'.",
-        "Permissão insuficiente",
-        [System.Windows.Forms.MessageBoxButtons]::OK,
-        [System.Windows.Forms.MessageBoxIcon]::Error
-    )
-
-    exit
-}
-
 # 2. ==================== EMBUTIR LOGO E ÍCONE (inclui a base64 da imagem e ícone) ====================
-
+# Logo
 function Get-Image($b64) {
     if ($b64.Length -gt 100) {
         $bytes = [Convert]::FromBase64String($b64)
@@ -174,6 +200,7 @@ function Get-Image($b64) {
     }
     return $null
 }
+# Ícone .ICO
 function Get-Icon($b64) {
     if ($b64.Length -gt 100) {
         $bytes = [Convert]::FromBase64String($b64)
@@ -184,6 +211,11 @@ function Get-Icon($b64) {
 }
 
 # 3. ==================== FUNÇÕES DE LOG E SUPORTE ====================
+# Controle de log em arquivo
+$script:EnableFileLog = $false
+$script:LogDirectory  = $null
+$script:LogFilePath   = $null
+
 # Função Log com Cor (verde para sucesso, vermelho para erro)
 function Log {
     param($Message, $Color = "Lime")
@@ -193,16 +225,29 @@ function Log {
         "Yellow" { [System.Drawing.Color]::Yellow }
         "Cyan"   { [System.Drawing.Color]::Cyan }
         "Lime"   { [System.Drawing.Color]::Lime }
+        "Gray"   { [System.Drawing.Color]::Gray }
         default  { [System.Drawing.Color]::Lime }
     }
 
-    $t = "[$(Get-Date -Format HH:mm:ss)] $Message"
+    $timestamp = Get-Date -Format "HH:mm:ss"
+    $line = "[$timestamp] $Message"
+
+    # Log visual
     $logBox.SelectionStart = $logBox.TextLength
     $logBox.SelectionLength = 0
     $logBox.SelectionColor = $col
-    $logBox.AppendText("$t`r`n")
+    $logBox.AppendText("$line`r`n")
     $logBox.SelectionColor = $logBox.ForeColor
     $logBox.ScrollToCaret()
+
+    # Log em arquivo
+    if ($script:EnableFileLog -and $script:LogFilePath) {
+        try {
+            Add-Content -Path $script:LogFilePath -Value $line -Encoding UTF8
+        } catch {
+            # Nunca interrompe o fluxo
+        }
+    }
 }
 
 # Teste rápido LDAPS
@@ -223,6 +268,24 @@ function Test-LdapsFast {
         $client.Close()
         return $true
     } catch { return $false }
+}
+
+# Testa conectividade LDAP realizando uma consulta mínima ao diretório
+function Test-LdapSearch {
+    param($DirectoryEntry)
+
+    try {
+        $s = New-Object System.DirectoryServices.DirectorySearcher
+        $s.SearchRoot = $DirectoryEntry
+        $s.Filter = "(objectClass=domain)"
+        $s.SearchScope = "Base"
+        $s.PropertiesToLoad.Add("distinguishedName") | Out-Null
+        $null = $s.FindOne()
+        return $true
+    }
+    catch {
+       return $false
+    }
 }
 
 # Alternar entre os panels
@@ -337,10 +400,25 @@ function Rename-ComputerAndReboot {
     }
 }
 
+# Função para limpeza agressiva de credenciais
+function Clear-DomainCredential {
+    if ($script:NetCred) {
+        $script:NetCred = $null
+    }
+    if ($script:DomainCred) {
+        $script:DomainCred = $null
+    }
+
+    # Força coleta de lixo e aguarda finalizadores para liberar recursos nativos
+    [GC]::Collect()
+    [GC]::WaitForPendingFinalizers()
+}
+
 # 4. ==================== FORMULÁRIO - GUI ====================
+# Formulário principal
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $TextForm
-$form.Size = [System.Drawing.Size]::new(520, 720)
+$form.Size = [System.Drawing.Size]::new(520, 730)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
@@ -428,7 +506,7 @@ $btnWelcomeNext.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawin
 $btnWelcomeNext.FlatStyle = "Flat"
 $btnWelcomeNext.FlatAppearance.BorderSize = 0
 $btnWelcomeNext.Anchor = 'Bottom,Right'
-$btnWelcomeNext.Location = [System.Drawing.Point]::new(340, 450)
+$btnWelcomeNext.Location = [System.Drawing.Point]::new(340, 460)
 $btnWelcomeNext.Size = '140,40'
 $btnWelcomeNext.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btnWelcomeNext.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -485,7 +563,7 @@ $btnHostNext.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.F
 $btnHostNext.FlatStyle = "Flat"
 $btnHostNext.FlatAppearance.BorderSize = 0
 $btnHostNext.Anchor = 'Bottom,Right'
-$btnHostNext.Location = [System.Drawing.Point]::new(340, 450)
+$btnHostNext.Location = [System.Drawing.Point]::new(340, 460)
 $btnHostNext.Size = '140,40'
 $btnHostNext.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btnHostNext.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -535,7 +613,7 @@ $btnHostBack.Font = [System.Drawing.Font]::new("Segoe UI", 12, [System.Drawing.F
 $btnHostBack.FlatStyle = "Flat"
 $btnHostBack.FlatAppearance.BorderSize = 0
 $btnHostBack.Anchor = 'Bottom,Left'
-$btnHostBack.Location = [System.Drawing.Point]::new(30, 450)
+$btnHostBack.Location = [System.Drawing.Point]::new(30, 460)
 $btnHostBack.Size = '140,40'
 $btnHostBack.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btnHostBack.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -686,7 +764,7 @@ $cbTipo.Add_SelectedIndexChanged({
 $textBoxes[0].Enabled = $domainTxtBoxEnable
 $cbTipo.Enabled       = $tipoCBoxEnable
 
-# Checkbox
+# Checkbox Reiniciar
 $chkRestart = New-Object System.Windows.Forms.CheckBox
 $chkRestart.Text = "Reiniciar automaticamente após concluir (recomendado)"
 $chkRestart.Checked = $true
@@ -710,7 +788,7 @@ $btn.Font = [System.Drawing.Font]::new("Segoe UI ", 10, [System.Drawing.FontStyl
 $btn.FlatStyle = "Flat"
 $btn.FlatAppearance.BorderSize = 0
 $btn.Size = [System.Drawing.Size]::new(240, 44)
-$btn.Location = [System.Drawing.Point]::new(140, 230)
+$btn.Location = [System.Drawing.Point]::new(140, 225)
 $btn.Anchor = 'Bottom'
 $btn.Add_MouseEnter({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 100, 195) })  # Hover effect
 $btn.Add_MouseLeave({ $this.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 215) })
@@ -718,7 +796,7 @@ $panelDomainJoin.Controls.Add($btn)
 
 # Barra de Progresso
 $progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = [System.Drawing.Point]::new(30, 284)
+$progressBar.Location = [System.Drawing.Point]::new(30, 279)
 $progressBar.Size = [System.Drawing.Size]::new(450, 20)
 $progressBar.Style = "Continuous"
 $progressBar.Anchor = 'Bottom,Left,Right'
@@ -726,7 +804,7 @@ $panelDomainJoin.Controls.Add($progressBar)
 
 # Log
 $logBox = New-Object System.Windows.Forms.RichTextBox
-$logBox.Location = [System.Drawing.Point]::new(30, 314)
+$logBox.Location = [System.Drawing.Point]::new(30, 309)
 $logBox.Size = [System.Drawing.Size]::new(450, 185)
 $logBox.BorderStyle = "FixedSingle"
 $logBox.Anchor = 'Bottom,Left,Right'
@@ -737,18 +815,103 @@ $logBox.BackColor = [System.Drawing.Color]::FromArgb(30,30,30)
 $logBox.ForeColor = [System.Drawing.Color]::Lime
 $panelDomainJoin.Controls.Add($logBox)
 
+# Checkbox - Salvar log em arquivo
+$chkSaveLog = New-Object System.Windows.Forms.CheckBox
+$chkSaveLog.Text = "Salvar log em arquivo"
+$chkSaveLog.AutoSize = $true
+$chkSaveLog.Font = [System.Drawing.Font]::new("Segoe UI", 9)
+$chkSaveLog.ForeColor = [System.Drawing.Color]::FromArgb(80, 80, 80)
+$chkSaveLog.FlatStyle = "Popup"
+
+# Posicionado logo acima do logBox
+$chkSaveLog.Location = New-Object System.Drawing.Point(
+    [int]$logBox.Left,
+    ([int]$logBox.Top + $logBox.Height)
+)
+
+$panelDomainJoin.Controls.Add($chkSaveLog)
+
+$chkSaveLog.Add_CheckedChanged({
+
+    # Se estiver marcando
+    if ($chkSaveLog.Checked) {
+
+        $folderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderDialog.Description = "Selecione o diretório para salvar o arquivo de log"
+        $folderDialog.ShowNewFolderButton = $true
+
+        $result = $folderDialog.ShowDialog()
+
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+            $script:LogDirectory  = $folderDialog.SelectedPath
+            $script:EnableFileLog = $true
+
+            Log "Log em arquivo está ativado." "Yellow"
+            Log "Diretório selecionado:" "Cyan"
+            Log " → $script:LogDirectory" "Cyan"
+        }
+        else {
+            # Cancelou → desmarca
+            $chkSaveLog.Checked   = $false
+            $script:EnableFileLog = $false
+            $script:LogDirectory  = $null
+        }
+    }
+    else {
+        # Desmarcou manualmente
+        $script:EnableFileLog = $false
+        $script:LogDirectory  = $null
+        $script:LogFilePath   = $null
+
+        Log "Log em arquivo está desativado." "Yellow"
+    }
+})
+
 # 5. ==================== EVENTO PRINCIPAL ====================
+# Ao clicar no botão $btn
 $btn.Add_Click({
+    # Desabilita o botão principal
     $btn.Enabled = $false
+
+    # Barra de Progresso inicia em 0%
     $progressBar.Value = 0
+
+    # Controle de restart
+    $script:DoRestart = $false
+
+    # Inicializa arquivo de log se habilitado
+    if ($script:EnableFileLog -and $script:LogDirectory) {
+
+        $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+
+        $script:LogFilePath = Join-Path `
+            $script:LogDirectory `
+            "DominioAutomatizado-$computerName-$timestamp.log"
+
+        # Cabeçalho do log
+        @(
+            "==============================================="
+            "Domínio Automatizado"
+            "Computador : $computerName"
+            "Usuário    : $env:USERNAME"
+            "Data/Hora  : $(Get-Date)"
+            "==============================================="
+            ""
+        ) | Set-Content -Path $script:LogFilePath -Encoding UTF8
+    }
+
+    # Tenta executar; em erro, trata no catch; sempre finaliza no finally
     try {
+        # Armazena os valores informados no formulário Domain Join
         $domainFQDN          = $textBoxes[0].Text.Trim()
         $computerDescription = $textBoxes[1].Text.Trim()
         $targetOU            = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["DN"]
         $targetGroupCN       = $OUMap[$cbTipo.SelectedItem][$cbOU.SelectedItem]["Grupo"]
 
-        [int]$PortLDAPS       = 636
+        # Define porta LDAPS padrão
+        [int]$PortLDAPS = 636
 
+        # Verifica se o campo Descrição do Computador foi preenchido, e informa caso não tenha
         if ([string]::IsNullOrWhiteSpace($computerDescription)) {
             throw "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
                   "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
@@ -757,6 +920,7 @@ $btn.Add_Click({
                   "• Para Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
         }
 
+        # Inicia a lógica
         # 1. Obtém credenciais de forma segura e armazena em memória para uso somente no contexto do script
         if (-not $script:DomainCred) {
             $lines = @(
@@ -778,9 +942,6 @@ $btn.Add_Click({
                 return
             }
         }
-
-        # Armazena credencial segura para uso pelo DirectoryEntry/LDAP, por não aceitar PSCredential
-        $script:NetCred = $script:DomainCred.GetNetworkCredential()
 
         # 2. Lista de TODOS os grupos gerenciados pelo script (Cliente + Servidor)
         Log "Mapeando todos os grupos do AD gerenciados pelo script associados ao OUMap..."
@@ -816,9 +977,9 @@ $btn.Add_Click({
 
         $SelectedDC = $null
         foreach ($dc in $DCList) {
-            Log "Testando LDAPS em $dc ..." "Cyan"
+            Log "Testando porta LDAPS em $dc ..." "Cyan"
             if (Test-LdapsFast -TargetHost $dc -Port $PortLDAPS) {
-                Log "LDAPS OK em $dc"
+                Log "LDAPS TCP disponível em $dc"
                 $SelectedDC = $dc
                 break
             } else {
@@ -833,29 +994,81 @@ $btn.Add_Click({
         $progressBar.Value = 20
 
         # 6. Ingressar no domínio
-        Log "Ingressando '$computerName' no domínio '$DomainName' via DC '$SelectedDC'..." "Cyan"
+        Log "Ingressando '$computerName' no domínio '$domainFQDN' via DC '$SelectedDC'..." "Cyan"
         Add-Computer -DomainName $domainFQDN -Server $SelectedDC -Credential $script:DomainCred -ErrorAction Stop -Force
         Log "Ingresso concluído!" "Lime"
 
         $progressBar.Value = 40
 
-        # 7. Move para OU
         Log "Aguardando tempo de replicação local do DC... (5 segundos)" "Cyan"
         Start-Sleep -Seconds 5
 
-        $progressBar.Value = 60
+        $progressBar.Value = 50
 
+        # 7. Inicia testes e operações LDAP
         Log "Movendo '$computerName' para a OU selecionada..." "Cyan"
 
-        # Define os tipos de autenticação (Secure + SecureSocketsLayer)
-        # O uso de 'Secure' garante autenticação segura e 'SecureSocketsLayer' ativa o SSL/TLS
-        $authSecure = [System.DirectoryServices.AuthenticationTypes]::Secure -bor 
-                      [System.DirectoryServices.AuthenticationTypes]::SecureSocketsLayer
+        #LDAP root com fallback
+        $script:NetCred = $script:DomainCred.GetNetworkCredential()
+        $root = $null
+        $usingLdaps = $false
 
-        # Cria o DirectoryEntry para a raiz do domínio com credenciais seguras e DC
-        $net = $script:DomainCred.GetNetworkCredential()
-        $root = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$DomainRoot", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
+        # Tentativa LDAPS (636)
+        try {
+            Log "Testando LDAPS (636) com operação real de busca..." "Cyan"
 
+            $authLdaps = [System.DirectoryServices.AuthenticationTypes]::Secure -bor `
+                         [System.DirectoryServices.AuthenticationTypes]::SecureSocketsLayer
+
+            $rootLdaps = New-Object System.DirectoryServices.DirectoryEntry(
+                "LDAP://${SelectedDC}:${PortLDAPS}/$DomainRoot",
+                $script:NetCred.UserName,
+                $script:NetCred.Password,
+                $authLdaps
+            )
+
+            if (Test-LdapSearch -DirectoryEntry $rootLdaps) {
+                $root = $rootLdaps
+                $usingLdaps = $true
+                Log "LDAPS validado com sucesso." "Lime"
+            }
+            else {
+                throw "Falha na operação LDAP real via LDAPS"
+            }
+        }
+        catch {
+            Log "LDAPS (636) não é possível neste cliente. Usando LDAP seguro (389 + signing)." "Yellow"
+
+            $authLdapSecure = [System.DirectoryServices.AuthenticationTypes]::Secure
+
+            $root = New-Object System.DirectoryServices.DirectoryEntry(
+                "LDAP://${SelectedDC}/$DomainRoot",
+                $script:NetCred.UserName,
+                $script:NetCred.Password,
+                $authLdapSecure
+            )
+
+            if (-not (Test-LdapSearch -DirectoryEntry $root)) {
+                throw "Falha ao estabelecer LDAP seguro com o domínio."
+            }
+
+            Log "LDAP seguro (389) estabelecido com sucesso." "Lime"
+        }
+
+        # Define a porta LDAP somente quando usando LDAPS (caso contrário, mantém vazio)
+        $ldapPort = if ($usingLdaps) { ":${PortLDAPS}" } else { "" }
+
+        # Define o tipo de autenticação:
+        # - LDAPS: combina Secure + SecureSocketsLayer (SSL/TLS)
+        # - LDAP comum: usa apenas Secure
+        $authChild = if ($usingLdaps) {
+            [System.DirectoryServices.AuthenticationTypes]::Secure -bor
+            [System.DirectoryServices.AuthenticationTypes]::SecureSocketsLayer
+        } else {
+            [System.DirectoryServices.AuthenticationTypes]::Secure
+        }
+
+        # 8. Movimentação para OU
         # Cria um searcher com o root especificado
         $compSearcher = New-Object System.DirectoryServices.DirectorySearcher
         $compSearcher.SearchRoot = $root
@@ -870,10 +1083,20 @@ $btn.Add_Click({
             $dn = $compResult.Properties["distinguishedName"][0]
 
             # Bind ao objeto do computador com credenciais e DC
-            $computer = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$dn", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
+            $computer = New-Object System.DirectoryServices.DirectoryEntry(
+                "LDAP://${SelectedDC}$ldapPort/$dn",
+                $script:NetCred.UserName,
+                $script:NetCred.Password,
+                $authChild
+            )
 
             # Bind à OU de destino com credenciais e DC
-            $newParent = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$targetOU", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
+            $newParent = New-Object System.DirectoryServices.DirectoryEntry(
+                "LDAP://${SelectedDC}$ldapPort/$targetOU",
+                $script:NetCred.UserName,
+                $script:NetCred.Password,
+                $authChild
+            )
 
             # Move o objeto para a nova OU usando MoveTo (sem renomear)
             $computer.MoveTo($newParent)
@@ -884,9 +1107,9 @@ $btn.Add_Click({
 
             Start-Sleep -Seconds 2
 
-            $progressBar.Value = 80
+            $progressBar.Value = 70
 
-            # 8. Remove o computador de TODOS os grupos gerenciados pelo script
+            # 9. Remove o computador de TODOS os grupos gerenciados pelo script
             Log "Sincronizando grupos conforme OU selecionada..." "Cyan"
             $removedAnyGroup = $false
 
@@ -904,7 +1127,12 @@ $btn.Add_Click({
 
                 if ($groupCleanResult) {
                     $grpDN = $groupCleanResult.Properties["distinguishedName"][0]
-                    $grpDE = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$grpDN", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
+                    $grpDE = New-Object System.DirectoryServices.DirectoryEntry(
+                        "LDAP://${SelectedDC}$ldapPort/$grpDN",
+                        $script:NetCred.UserName,
+                        $script:NetCred.Password,
+                        $authChild
+                    )
                     try {
                         $grpDE.Invoke("Remove", $computer.ADsPath)
                         $grpDE.CommitChanges()
@@ -920,7 +1148,7 @@ $btn.Add_Click({
                 Log "Nenhum grupo antigo gerenciado encontrado para remoção." "Gray"
             }
 
-            # 9. Adiciona ao grupo
+            # 10. Adiciona ao grupo
             Log "Adicionando '$computerName' no grupo selecionado..." "Cyan"
 
             # Cria um searcher para o grupo baseado no CN
@@ -935,14 +1163,19 @@ $btn.Add_Click({
 
             if ($groupResult -ne $null) {
                 $targetGroupDN = $groupResult.Properties["distinguishedName"][0]
-                $group = New-Object System.DirectoryServices.DirectoryEntry("LDAP://${SelectedDC}:${PortLDAPS}/$targetGroupDN", $script:NetCred.UserName, $script:NetCred.Password, $authSecure)
+                $group = New-Object System.DirectoryServices.DirectoryEntry(
+                    "LDAP://${SelectedDC}$ldapPort/$targetGroupDN",
+                    $script:NetCred.UserName,
+                    $script:NetCred.Password,
+                    $authChild
+                )
 
                 try {
                     $group.Invoke("Add", $computer.ADsPath)
                     $group.CommitChanges()
                     Log "O computador $computerName foi adicionado ao grupo: $targetGroupDN" "Lime"
                     Start-Sleep -Seconds 2
-                    $progressBar.Value = 90
+                    $progressBar.Value = 80
                 }
                 catch {
                     $errCode = $_.Exception.HResult
@@ -950,7 +1183,7 @@ $btn.Add_Click({
                         # 0x80071392 = já existe
                         Log "Computador JÁ faz parte do grupo '$targetGroupCN' (ignorando)" "Yellow"
                         Start-Sleep -Seconds 2
-                        $progressBar.Value = 90
+                        $progressBar.Value = 80
                     }
                     else {
                         throw $_  # outros erros são reais ? mostra em vermelho
@@ -964,7 +1197,7 @@ $btn.Add_Click({
             throw "Computador $computerName não encontrado no domínio."
         }
 
-        # 10. Atualiza descrição do computador no AD
+        # 11. Atualiza descrição do computador no AD
         Log "Atualizando descrição do computador no Active Directory..." "Cyan"
 
         $computer.Properties["description"].Value = $computerDescription
@@ -974,9 +1207,12 @@ $btn.Add_Click({
         Log " → $computerDescription" "Cyan"
 
         Start-Sleep -Seconds 1
-        $progressBar.Value = 95
+        $progressBar.Value = 90
 
-        # 11. Atualiza descrição local do Windows
+        # 12. Limpa credenciais o quanto antes após operações no AD
+        Clear-DomainCredential
+
+        # 13. Atualiza descrição local do Windows
         Log "Atualizando descrição local do Windows..." "Cyan"
 
         Set-ItemProperty `
@@ -991,28 +1227,77 @@ $btn.Add_Click({
         Start-Sleep -Seconds 1
         $progressBar.Value = 100
 
-     if ($chkRestart.Checked) {
-         [System.Windows.Forms.MessageBox]::Show("Tudo feito com sucesso!`nA máquina será reiniciada em 5 segundos após OK.", "Sucesso", 0, 64)
-         Start-Sleep -Seconds 5
-         Restart-Computer -Force
-     } else {
-            Log "Reinicie para aplicar totalmente." "Yellow"
-            [System.Windows.Forms.MessageBox]::Show("Tudo feito com sucesso!`nReinicie para aplicar totalmente.", "Sucesso", 0, 64)
+        if ($chkRestart.Checked) {
+            Log "Reinicialização solicitada pelo usuário." "Cyan"
+            [System.Windows.Forms.MessageBox]::Show(
+                "Tudo feito com sucesso!`n`nO computador será reiniciado após fechar esta janela.",
+                "Sucesso",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
+            $script:DoRestart = $true
+        }
+        else {
+            Log "Reinicie o computador para aplicar totalmente as alterações." "Yellow"
+            [System.Windows.Forms.MessageBox]::Show(
+                "Tudo feito com sucesso!`n`nReinicie o computador para aplicar totalmente as alterações.",
+                "Sucesso",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
+        }
+    } catch {
+        Log "ERRO: $($_.Exception.Message)" "Red"
+        [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Erro", 0, 16)
+    } finally {
+        # Garante que as credenciais foram limpadas
+        Clear-DomainCredential
+
+        # Informa o local do log se estiver ativo (independente de sucesso ou erro)
+        if ($script:EnableFileLog -and $script:LogFilePath) {
+            Log "Log salvo em arquivo:" "Gray"
+            Log " → $script:LogFilePath" "Gray"
         }
 
- } catch {
-     Log "ERRO: $($_.Exception.Message)" "Red"
-     [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Erro", 0, 16)
- } finally {
-     $script:DomainCred = $null
-     $btn.Enabled = $true
-     $progressBar.Value = 0
- }
+        # Habilita novamente o botão
+        $btn.Enabled = $true
+        # Retorna a barra de progresso para 0%
+        $progressBar.Value = 0
+    }
+
+    if ($script:DoRestart) {
+        Log "Reiniciando o computador em 5 segundos..." "Cyan"
+        Start-Sleep -Seconds 5
+        Restart-Computer -Force
+    }
 })
 
+# 6. ==================== EXECUÇÃO PRINCIPAL ====================
+# Ponto de entrada: orquestra as chamadas após as declarações
+
+# Verifica se o script está sendo executado como Administrador
+$principal = New-Object Security.Principal.WindowsPrincipal(
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+)
+
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+
+    [System.Windows.Forms.MessageBox]::Show(
+        "Este aplicativo precisa ser executado como Administrador.`n`n" +
+        "Clique com o botão direito no arquivo e selecione:`n" +
+        "'Executar como administrador'.",
+        "Permissão insuficiente",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Error
+    )
+
+    exit
+}
+
+# Primeiro registro de Log
 Log "Aplicativo iniciado - pronto para uso." "Lime"
 
-# Alerta antes se está no domínio
+# Emite alerta se estiver no domínio
 if ($isDomainJoined) {
     [System.Windows.Forms.MessageBox]::Show(
         "Este computador já está ingressado no domínio:`n`n$currentDomain`n`n" +
@@ -1029,13 +1314,15 @@ if ($isDomainJoined) {
     )
 }
 
+# Adiciona ao formulário os painéis que compõem as etapas do assistente
 $form.Controls.AddRange(@(
     $panelWelcome,
     $panelHostname,
     $panelDomainJoin
 ))
 
+# Exibe a primeira etapa do assistente ao iniciar a interface
 Show-Step 'Welcome'
+
+# Abre a janela principal
 $form.ShowDialog()
-
-
