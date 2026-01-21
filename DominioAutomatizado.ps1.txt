@@ -414,6 +414,20 @@ function Clear-DomainCredential {
     [GC]::WaitForPendingFinalizers()
 }
 
+# Função de help para os campos do formulário
+function Register-Help {
+    param (
+        [System.Windows.Forms.Control]$Control,
+        [string]$Message
+    )
+
+    # Ativa ajuda contextual para o controle
+    $helpProvider.SetShowHelp($Control, $true)
+
+    # Texto exibido no balão de ajuda
+    $helpProvider.SetHelpString($Control, $Message)
+}
+
 # 4. ==================== FORMULÁRIO - GUI ====================
 # Formulário principal
 $form = New-Object System.Windows.Forms.Form
@@ -422,6 +436,8 @@ $form.Size = [System.Drawing.Size]::new(520, 730)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedDialog"
 $form.MaximizeBox = $false
+$form.MinimizeBox = $false
+$form.HelpButton  = $true
 $form.BackColor = [System.Drawing.Color]::FromArgb(245, 245, 245)  # Fundo cinza claro suave
 $form.Icon = Get-Icon $iconBase64
 
@@ -443,6 +459,10 @@ foreach ($panel in @($panelWelcome, $panelHostname, $panelDomainJoin)) {
 $panelWelcome.Visible    = $false
 $panelHostname.Visible   = $false
 $panelDomainJoin.Visible = $false
+
+# HelpProvider global – responsável pelo botão "?" da janela
+$helpProvider = New-Object System.Windows.Forms.HelpProvider
+$helpProvider.HelpNamespace = ""   # não usamos arquivo .chm
 
 # Painel Cabeçalho
 $headerPanel = New-Object System.Windows.Forms.Panel
@@ -519,6 +539,11 @@ $panelWelcome.Controls.AddRange(@(
     $lblWelcomeInfo,
     $btnWelcomeNext
 ))
+
+# Registros de ajuda
+Register-Help `
+    -Control $btnWelcomeNext `
+    -Message "Clique para avançar para a etapa de definição do nome do computador."
 
 # ETAPA 2 - Hostname
 $lblHost = New-Object System.Windows.Forms.Label
@@ -630,6 +655,27 @@ $panelHostname.Controls.AddRange(@(
     $btnHostBack
 ))
 
+# Registros de ajuda
+Register-Help `
+    -Control $rbHostYes `
+    -Message "Selecione esta opção caso deseje alterar o nome do computador antes do ingresso no domínio."
+
+Register-Help `
+    -Control $rbHostNo `
+    -Message "Selecione esta opção para manter o nome atual do computador."
+
+Register-Help `
+    -Control $txtHostname `
+    -Message "Informe o novo nome do computador. O nome deve seguir o padrão NetBIOS e conter apenas letras, números e hífen."
+
+Register-Help `
+    -Control $btnHostNext `
+    -Message "Avança para a etapa de ingresso ou reaplicação no domínio."
+
+Register-Help `
+    -Control $btnHostBack `
+    -Message "Retorna para a etapa anterior."
+
 # ETAPA 3 - Campos do DomainJoin
 # Painel Campos do Domain Join
 $fieldsPanel = New-Object System.Windows.Forms.Panel
@@ -720,8 +766,9 @@ foreach ($txt in $labels) {
         if ($txt -eq "Descrição do equipamento:") {
             $toolTip.SetToolTip(
                 $tb,
-                "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n" +
-                "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
+                "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
+                "Padrão sugerido:`n" +
+                "[Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
                 "Exemplos:`n" +
                 "• Para Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
                 "• Para Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
@@ -867,6 +914,67 @@ $chkSaveLog.Add_CheckedChanged({
     }
 })
 
+# Registros de ajuda
+# Campo Domínio
+Register-Help `
+    -Control $textBoxes[0] `
+    -Message "Informe o domínio Active Directory no formato FQDN (ex.: contoso.com). Normalmente este campo já vem preenchido."
+
+# Tipo de Equipamento
+Register-Help `
+    -Control $cbTipo `
+    -Message "Selecione se este computador é um cliente (estação de trabalho) ou um servidor."
+
+# Unidade Organizacional
+Register-Help `
+    -Control $cbOU `
+    -Message "Selecione a Unidade Organizacional onde o computador será movido após o ingresso no domínio."
+
+# Descrição do Equipamento
+Register-Help `
+    -Control $textBoxes[1] `
+    -Message `
+    "Informe a descrição do equipamento. Clique duas vezes para ver exemplos."
+
+$textBoxes[1].Add_DoubleClick({
+    [System.Windows.Forms.MessageBox]::Show(
+        "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
+        "Padrão sugerido:`n" +
+        "[Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
+        "Exemplos:`n" +
+        "• Para Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
+        "• Para Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)",
+        "Ajuda – Descrição do Equipamento",
+        [System.Windows.Forms.MessageBoxButtons]::OK,
+        [System.Windows.Forms.MessageBoxIcon]::Information
+    )
+})
+
+# Checkbox Reiniciar
+Register-Help `
+    -Control $chkRestart `
+    -Message "Se marcado, o computador será reiniciado automaticamente após a conclusão do processo."
+
+# Botão principal
+Register-Help `
+    -Control $btn `
+    -Message "Inicia o processo de ingresso ou reaplicação do computador no domínio."
+
+# Barra de Progresso
+Register-Help `
+    -Control $progressBar `
+    -Message "Exibe o andamento das etapas de ingresso, movimentação de OU e associação a grupos."
+
+# Log
+Register-Help `
+    -Control $logBox `
+    -Message "Exibe mensagens detalhadas sobre o andamento e possíveis erros durante o processo."
+
+# Checkbox Salvar Log
+Register-Help `
+    -Control $chkSaveLog `
+    -Message "Ativa a gravação do log em arquivo. Ao marcar, será solicitado o diretório para salvar."
+
 # 5. ==================== EVENTO PRINCIPAL ====================
 # Ao clicar no botão $btn
 $btn.Add_Click({
@@ -914,7 +1022,8 @@ $btn.Add_Click({
         # Verifica se o campo Descrição do Computador foi preenchido, e informa caso não tenha
         if ([string]::IsNullOrWhiteSpace($computerDescription)) {
             throw "Informe a descrição do equipamento, sem citar usuário ou sistema operacional.`n`n" +
-                  "Padrão sugerido: [Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
+                  "Padrão sugerido:`n" +
+                  "[Setor] - [Localização] - [Patrimônio] - [Função].`n`n" +
                   "Exemplos:`n" +
                   "• Para Estação/Cliente: ADMINISTRAÇÃO - PRÉDIO XYZ (ANDAR 2 - SALA 201) - PAT12345 - Estação/Cliente`n" +
                   "• Para Servidor: CPD - PRÉDIO NOVO (SALA CPD) - PAT67890 - Servidor de Aplicações (serviço XYZ)"
