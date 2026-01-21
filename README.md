@@ -29,6 +29,10 @@ A versão **2.1** introduz melhorias focadas em **segurança**, **robustez opera
 >   * Remove automaticamente de outros grupos gerenciados pelo script.
 > * Definição e aplicação da **Descrição do equipamento**, tanto no Windows quanto no Active Directory.
 > * Interface gráfica em formato **Wizard** (GUI moderna e orientada ao time de suporte).
+> * **Sistema de ajuda contextual integrado (botão “?”)**:
+>
+>   * Permite ao operador clicar no botão de ajuda da janela e, em seguida, em qualquer campo do formulário.
+>   * Exibe orientações rápidas e objetivas sobre o preenchimento correto de cada campo.
 > * Logs detalhados em tempo real na interface.
 > * **Geração opcional de log em arquivo**, com seleção interativa do diretório de salvamento.
 > * Comunicação segura com o Active Directory:
